@@ -2546,6 +2546,12 @@
 	border-radius: 8px;
 }
 
+#banner p{
+	display: inline-block;
+	max-width: 40em;
+	align-self: center;
+}
+
 @keyframes fadein {
     from { opacity: 0; }
     to   { opacity: 1; }
