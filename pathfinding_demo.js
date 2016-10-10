@@ -75,6 +75,7 @@ class Environment {
             {x:16,y:15},
             {x:16,y:16},
             {x:16,y:17},
+            {x:18,y:17},
             {x:9,y:9}
         ];
 
@@ -311,8 +312,8 @@ class AStar {
 
 environment = new Environment(40, 40);
 var canvas = document.getElementById(canvas_name);
-var robot = {width: canvas.width/environment.width, height: canvas.height/environment.height,
-            x:3, y:10};
+var robot = {width: 2*(canvas.width/environment.width), height: 2*(canvas.height/environment.height),
+            x:3, y:10, rotation: 0};
 
 grid = environment.grid;
 // node = grid[10][11];
@@ -338,6 +339,8 @@ function render(){
             x: canvas.width/environment.width,
             y: canvas.height/environment.height
         };
+        ctx.save();
+        ctx.translate(block_size.x/2, block_size.y/2);
         for (var y = 0; y < environment.height; y++){
             for (var x = 0; x < environment.width; x++){
                 if (environment.grid[x][y].path){
@@ -354,12 +357,20 @@ function render(){
                 }
             }
         }
+        ctx.restore();
 
         // Draw the robot
-        ctx.fillStyle = "rgb(244, 66, 66)";
-        ctx.fillRect(this.robot.x * ratio.x, this.robot.y * ratio.y, this.robot.width, this.robot.height);
-
-
+        // ctx.fillStyle = "rgb(244, 66, 66)";
+        // ctx.fillRect(this.robot.x * ratio.x, this.robot.y * ratio.y, this.robot.width, this.robot.height);
+        ctx.save();
+        ctx.translate(this.robot.x * ratio.x + (this.robot.width/2),
+                    this.robot.y * ratio.y + (this.robot.height/2));
+        ctx.rotate(robot.rotation + Math.PI/2);
+        ctx.translate(-this.robot.width/2, -this.robot.height/2);
+        var drawing = new Image();
+        drawing.src = 'images/rover1.png';
+        ctx.drawImage(drawing, 0,0, this.robot.width, this.robot.height);
+        ctx.restore();
     }
     console.log("Finished rendering!");
 }
@@ -368,13 +379,13 @@ function render(){
 function followPath(path){
     var canvas = document.getElementById('some_canvas');
 
-    function move_(){
-        if (path.length == 0){
+    function move_() {
+        if (path.length <= 0) {
             return;
         }
         var dest = {
-            x: path[path.length -1].pos.x,
-            y: path[path.length -1].pos.y
+            x: path[path.length - 1].pos.x,
+            y: path[path.length - 1].pos.y
         };
         var distance_to_dest = Math.sqrt(Math.pow(robot.x - dest.x, 2)
             + Math.pow(robot.y - dest.y, 2));
@@ -383,10 +394,18 @@ function followPath(path){
         var delta_x = Math.cos(angle_to_dest) * move_speed;
         var delta_y = Math.sin(angle_to_dest) * move_speed;
 
-        if (distance_to_dest > 0.1){
-            console.log(distance_to_dest);
-            robot.x -= delta_x;
-            robot.y -= delta_y;
+        console.log(Math.abs((angle_to_dest - robot.rotation) % Math.PI));
+        if (Math.abs((angle_to_dest - robot.rotation) % (2 * Math.PI)) > (0.314/2)){
+            if ((angle_to_dest - robot.rotation) % (2 * Math.PI) < 0 ||
+                (angle_to_dest - robot.rotation) % (2 * Math.PI) > Math.PI){
+                robot.rotation = (robot.rotation % Math.PI) - 0.314
+            } else {
+                robot.rotation = (robot.rotation % Math.PI) + 0.314
+            }
+        } else if (distance_to_dest > 0.1){
+        // console.log(distance_to_dest);
+        robot.x -= delta_x;
+        robot.y -= delta_y;
         } else {
             path = path.slice(0,-1);
         }
@@ -396,8 +415,9 @@ function followPath(path){
     move_();
 }
 
-console.log("Path: ", path = astar.search(grid, grid[3][14], grid[27][10]));
+console.log("Path: ", path = astar.search(grid, grid[3][14], grid[27][15]));
 
+// environment.render_debug("some_canvas");
 followPath(path);
 
 // render();
