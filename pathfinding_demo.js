@@ -1,52 +1,12 @@
 // TODO: Deal with window resizing
-
+// TODO: Split classes into separate files
 
 /** ------- CLASS DECLARATIONS ------- **/
 
 /** ------- GENERAL ANIMATION SETTINGS ------- **/
-var draw_time = 1;
+var draw_time = 50;
 
-var move_speed = 1;
-
-var robot = {width:50, height:50, x:50, y:225};
-// Obstacles are blocks
-var obstacles = [{width:100, height:100, x:250, y:200}];
-
-var goal = {x:450, y:200};
-
-function draw() {
-    var canvas = document.getElementById('some_canvas');
-
-    // Check to make sure the browser supports '<canvas>'
-    if (canvas.getContext){
-        var ctx = canvas.getContext('2d');
-
-        // Clear the canvas
-        ctx.clearRect(0,0, canvas.width, canvas.height);
-
-        // Resize the canvas to the window size
-        //canvas.width  = window.innerWidth;
-        //canvas.height = window.innerHeight;
-
-        // Draw some Stuff
-        ctx.fillStyle = "rgb(200, 0, 0)";
-        ctx.fillRect (10, 10, 50, 50);
-
-        ctx.fillStyle = "rgba(0, 0, 200, 0.5)";
-        ctx.fillRect (30, 30, 50, 50);
-
-        // Draw the robot
-        ctx.fillStyle = "rgb(200, 200, 200)";
-        ctx.fillRect(robot.x, robot.y, robot.width, robot.height);
-
-        function draw_obstacle(obstacle){
-            ctx.fillStyle = "rgb (400, 200, 100)";
-            ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
-        }
-        // Draw the Obstacles
-        obstacles.forEach(draw_obstacle);
-    }
-}
+var move_speed = 0.1;
 
 function reDraw(){
     window.requestAnimationFrame(draw);
@@ -55,38 +15,14 @@ function reDraw(){
     }
     setTimeout(_reDraw, draw_time);
 }
+var canvas_name = "some_canvas";
 
 
 // TODO: Function to place obstacles randomly, but within the canvas bounds
 
 // TODO: Function to check if a given coordinate is occupied
 
-// TODO: inflation function to generate inflated obstacles for navigation
-
 // TODO: (Probably) A smoothing function for the path
-
-// TODO: A*
-
-/*
-function a_star(start, goal){
-    closed_set = [];
-    open_set = [];
-
-    while (open_set != []){
-        // Current node is the node in the open set with the lowest f_score
-        current_node = open_set[0];
-        for (i = 0; i < open_set.length; i++){
-            if (open_set[i].f < current_node.f){
-                current_node = open_set[i];
-            }
-        }
-
-        // If you're at goal, return the path
-
-        //open
-    }
-}
-*/
 
 function sleep(milliseconds) {
     var start = new Date().getTime();
@@ -107,6 +43,7 @@ class Node {
         this.path = false;
         this.closed = false;
         this.obstacle = false;
+        this.inflated = true; // Whether or not this was an inflated obstacle
     }
 }
 
@@ -119,24 +56,68 @@ class Environment {
         for (var x = 0; x < height; x++){
             this.grid[x] = new Array(width);
             for (var y = 0; y < width; y++){
-                console.log("Created a Node!")
+                // console.log("Created a Node!")
                 this.grid[x][y] = new Node(x,y);
             }
         }
 
         // Sets nodes to be obstacles
-        this.obstacles = [{x:10, y:10}, {x:0, y:0}, {x:19, y:19}];
-        for (var node = 0; node < this.obstacles.length; node++){
-            this.grid[this.obstacles[node].x][this.obstacles[node].y].obstacle = true;
+        this.obstacles = [
+            {x:11, y:9},
+            {x:0, y:0},
+            {x:20, y:18},
+            {x:12,y:10},
+            {x:13,y:11},
+            {x:14,y:12},
+            {x:14,y:13},
+            {x:15,y:13},
+            {x:16,y:14},
+            {x:16,y:15},
+            {x:16,y:16},
+            {x:16,y:17},
+            {x:9,y:9}
+        ];
+
+        this.inflated_obstacles = this.inflate_obstacles(this.obstacles);
+        // console.log(this.inflated_obstacles);
+        for (var node = 0; node < this.inflated_obstacles.length; node++){
+            this.grid[this.inflated_obstacles[node].x][this.inflated_obstacles[node].y].obstacle = true;
+            // Check if the inflated obstacle is an original obstacle
+            for (var i = 0; i < this.obstacles.length; i++){
+                if (this.inflated_obstacles[node].x == this.obstacles[i].x &&
+                    this.inflated_obstacles[node].y == this.obstacles[i].y){
+                    this.grid[this.inflated_obstacles[node].x][this.inflated_obstacles[node].y].inflated = false;
+                    continue;
+                }
+            }
+            // console.log("got her");
         }
 
-        this.robot = {width:50, height:50, x:50, y:225};
-        this.start = {x:0, y:5};
-        this.goal = {x:18, y:5};
+        // this.robot = {width:50, height:50, x:50, y:225};
+        // this.start = {x:10, y:5};
+        // this.goal = {x:18, y:5};
     }
-    
-    // Renders the Environment, including grid points, obstacles and robot 
-    render(canvas_name){
+
+    // Inflates the obstacles
+    inflate_obstacles(obstacles){
+        var inflated_obstacles = [];
+        for (var i = 0; i < obstacles.length; i++){
+            for (var x = -1; x <= 1; x++){
+                for (var y = -1; y <= 1; y++){
+                    var coor = {x: obstacles[i].x + x, y: obstacles[i].y + y};
+                    if (coor.y < this.height && coor.y >= 0 &&
+                        coor.x < this.width && coor.x >= 0 &&
+                        !(coor.x == 0 && coor.y == 0)) {
+                        inflated_obstacles.push(coor);
+                    }
+                }
+            }
+        }
+        return inflated_obstacles;
+    }
+    // Renders the Environment, including grid points, obstacles and robot
+    // in a way that makes it easier to debug
+    render_debug(canvas_name){
         var canvas = document.getElementById(canvas_name);
 
         // Check to make sure the browser supports '<canvas>'
@@ -188,8 +169,9 @@ class Environment {
     }
 }
 
+
 class AStar {
-    search (grid, start, goal){
+    search(grid, start, goal) {
         var openSet = [];
         var closedSet = [];
         openSet.push(start);
@@ -198,26 +180,26 @@ class AStar {
         start.f = start.h;
 
         var ticker = 0;
-        while (openSet != []){
+        while (openSet.length != 0) {
             ticker += 1;
             // console.log("OpenSet: ", openSet);
             // console.log("ClosedSet", closedSet);
             // Current node is the node in openSet with least fScore
             // TODO: Re-emplement with binary heap for improved speed here
             var current = openSet[0];
-            for (let i = 0; i < openSet.length; i++){
-                if (openSet[i].f < current.f){
+            for (let i = 0; i < openSet.length; i++) {
+                if (openSet[i].f < current.f) {
                     current = openSet[i];
                 }
             }
-            // console.log("Current: ", current.pos);
 
-            if (current == goal){
+             if (current == goal) {
                 closedSet.push(current);
                 current.closed = true;
                 console.log("Reached the goal!");
+                console.log("Explored ", closedSet.length, " nodes");
                 var path = [];
-                while (current != start){
+                while (current != start) {
                     path.push(current);
                     current.path = true;
                     current = current.parent;
@@ -230,25 +212,30 @@ class AStar {
 
             // Remove current node from openSet
             let i = openSet.indexOf(current);
-            if (i !== -1){
+            if (i !== -1) {
                 openSet.splice(i, 1);
             }
 
             closedSet.push(current);
             current.closed = true;
             var neighbours = this.neighbours(current, grid);
-            for (let i = 0; i < neighbours.length; i++){
+            for (let i = 0; i < neighbours.length; i++) {
                 var neighbour = neighbours[i];
-                if (!neighbour.closed){
+                if (!neighbour.closed) {
+                    // var tentative_g_score = this.heuristic(current.x, current.y, neighbour.x, neighbour.y);
                     var tentative_g_score = current.g + 1;
+                    if (Math.abs(current.pos.x - neighbour.pos.x) != 0 &&
+                        Math.abs(current.pos.y - neighbour.pos.y) != 0){
+                        tentative_g_score = current.g + 1.2;
+                    }
                     let i = openSet.indexOf(neighbour);
-                    if (i === -1){ // if neighbour not in openSet
+                    if (i === -1) { // if neighbour not in openSet
                         neighbour.parent = current;
                         neighbour.g = tentative_g_score;
                         neighbour.h = this.heuristic(neighbour.pos.x, neighbour.pos.y, goal.pos.x, goal.pos.y);
                         neighbour.f = neighbour.g + neighbour.h;
                         openSet.push(neighbour);
-                    } else if (tentative_g_score < neighbour.g || neighbour.g < 0){
+                    } else if (tentative_g_score < neighbour.g || neighbour.g < 0) {
                         neighbour.parent = current;
                         neighbour.g = tentative_g_score;
                         neighbour.h = this.heuristic(neighbour.pos.x, neighbour.pos.y, goal.pos.x, goal.pos.y);
@@ -260,82 +247,159 @@ class AStar {
         return -1;
     }
 
-    heuristic (x1, y1, x2, y2){
-        // Manhatten Heuristic
+    heuristic(x1, y1, x2, y2) {
         // TODO: Add more heuristic options
+        // Manhatten Heuristic
         // var d1 = Math.abs (x1 - x2);
         // var d2 = Math.abs (y1 - y2);
-        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2-y1, 2));
+        // return d1 + d2;
+        var D = 1; // Cost of straight movement
+        var D2 = 1.2; // Cost of Diagonal Movement
+        var dx = Math.abs(x2 - x1);
+        var dy = Math.abs(y2 - y1);
+        return D * (dx + dy) + (D2 - 2 * D) * Math.min(dx, dy);
     }
 
     // Returns the neighbours of a given node
-    neighbours (node, grid){
+    neighbours(node, grid) {
+        //TODO: please refactor this. So much repitition
         var neighbours = [];
-        
-        // Check each of the 4 neighbours
+
+        // Check each of the 8 neighbours
         // Check because javascript 2D arrays are a hack
-        if (grid[node.pos.x - 1] != null){
-            if (grid[node.pos.x - 1][node.pos.y] != null 
-                && !grid[node.pos.x - 1][node.pos.y].obstacle){
+        if (grid[node.pos.x - 1] != null) {
+            if (grid[node.pos.x - 1][node.pos.y] != null
+                && !grid[node.pos.x - 1][node.pos.y].obstacle) {
                 neighbours.push(grid[node.pos.x - 1][node.pos.y]);
             }
-            if (grid[node.pos.x][node.pos.y - 1] != null 
-                && !grid[node.pos.x][node.pos.y - 1].obstacle){
+            if (grid[node.pos.x][node.pos.y - 1] != null
+                && !grid[node.pos.x][node.pos.y - 1].obstacle) {
                 neighbours.push(grid[node.pos.x][node.pos.y - 1]);
             }
-        }
-        // Check because javascript 2D arrays are a hack
-        if (grid[node.pos.x + 1] != null){
-            if (grid[node.pos.x][node.pos.y + 1] != null 
-                && !grid[node.pos.x][node.pos.y + 1].obstacle){
-                neighbours.push(grid[node.pos.x][node.pos.y + 1]);
+            if (grid[node.pos.x - 1][node.pos.y - 1] != null
+                && !grid[node.pos.x - 1][node.pos.y - 1].obstacle) {
+                neighbours.push(grid[node.pos.x - 1][node.pos.y - 1]);
+
+                if (grid[node.pos.x - 1][node.pos.y + 1] != null
+                    && !grid[node.pos.x - 1][node.pos.y + 1].obstacle) {
+                    neighbours.push(grid[node.pos.x - 1][node.pos.y + 1]);
+                }
             }
-            if (grid[node.pos.x + 1][node.pos.y] != null 
-                && !grid[node.pos.x + 1][node.pos.y].obstacle){
-                neighbours.push(grid[node.pos.x + 1][node.pos.y]);
+            // Check because javascript 2D arrays are a hack
+            if (grid[node.pos.x + 1] != null) {
+                if (grid[node.pos.x][node.pos.y + 1] != null
+                    && !grid[node.pos.x][node.pos.y + 1].obstacle) {
+                    neighbours.push(grid[node.pos.x][node.pos.y + 1]);
+                }
+                if (grid[node.pos.x + 1][node.pos.y] != null
+                    && !grid[node.pos.x + 1][node.pos.y].obstacle) {
+                    neighbours.push(grid[node.pos.x + 1][node.pos.y]);
+                }
+                if (grid[node.pos.x + 1][node.pos.y - 1] != null
+                    && !grid[node.pos.x + 1][node.pos.y - 1].obstacle) {
+                    neighbours.push(grid[node.pos.x + 1][node.pos.y - 1]);
+                }
+                if (grid[node.pos.x + 1][node.pos.y + 1] != null
+                    && !grid[node.pos.x + 1][node.pos.y + 1].obstacle) {
+                    neighbours.push(grid[node.pos.x + 1][node.pos.y + 1]);
+                }
             }
         }
         return neighbours;
     }
 }
 
-// Allows you to move to any part of the screen
-function move(dest_x_ratio, dest_y_ratio){
+environment = new Environment(40, 40);
+var canvas = document.getElementById(canvas_name);
+var robot = {width: canvas.width/environment.width, height: canvas.height/environment.height,
+            x:3, y:10};
+
+grid = environment.grid;
+// node = grid[10][11];
+astar = new AStar(environment);
+//console.log(astar.neighbours(node, grid));
+// console.log("Path: ", path = astar.search(grid, grid[3][14], grid[17][12]));
+// environment.render_debug("some_canvas");
+
+
+function render(){
+    var canvas = document.getElementById(canvas_name);
+
+    // Check to make sure the browser supports '<canvas>'
+    if (canvas.getContext){
+        // Determine the ratio to multiply stuff by
+        var ratio = {x: canvas.width/environment.width, y: canvas.height/environment.height};
+        var ctx = canvas.getContext('2d');
+
+        // Clear the canvas
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+
+        var block_size = {
+            x: canvas.width/environment.width,
+            y: canvas.height/environment.height
+        };
+        for (var y = 0; y < environment.height; y++){
+            for (var x = 0; x < environment.width; x++){
+                if (environment.grid[x][y].path){
+                    ctx.fillStyle = "rgb(69, 69, 244)";
+                    ctx.fillRect(
+                        x * (canvas.width/environment.width),
+                        y * (canvas.height/environment.height),
+                        block_size.x, block_size.y);
+                } else if (environment.grid[x][y].obstacle && !environment.grid[x][y].inflated){
+                    ctx.fillStyle = "rgb(0, 0, 0)";
+                    ctx.fillRect(x * (canvas.width/environment.width),
+                                y * (canvas.height/environment.height),
+                                block_size.x, block_size.y);
+                }
+            }
+        }
+
+        // Draw the robot
+        ctx.fillStyle = "rgb(244, 66, 66)";
+        ctx.fillRect(this.robot.x * ratio.x, this.robot.y * ratio.y, this.robot.width, this.robot.height);
+
+
+    }
+    console.log("Finished rendering!");
+}
+
+// Makes the robot follow a given path
+function followPath(path){
     var canvas = document.getElementById('some_canvas');
-    var dest = {
-        x: dest_x_ratio * canvas.width,
-        y: dest_y_ratio * canvas.height
-    };
 
     function move_(){
-        var distance_to_dest = Math.sqrt(Math.pow(robot.x + (robot.width/2) - dest.x, 2)
-                                + Math.pow(robot.y + (robot.height/2) - dest.y, 2));
+        if (path.length == 0){
+            return;
+        }
+        var dest = {
+            x: path[path.length -1].pos.x,
+            y: path[path.length -1].pos.y
+        };
+        var distance_to_dest = Math.sqrt(Math.pow(robot.x - dest.x, 2)
+            + Math.pow(robot.y - dest.y, 2));
         var angle_to_dest = Math.atan2(robot.y - dest.y, robot.x - dest.x);
 
         var delta_x = Math.cos(angle_to_dest) * move_speed;
         var delta_y = Math.sin(angle_to_dest) * move_speed;
 
-        if (distance_to_dest > 10){
+        if (distance_to_dest > 0.1){
+            console.log(distance_to_dest);
             robot.x -= delta_x;
             robot.y -= delta_y;
         } else {
-            return;
+            path = path.slice(0,-1);
         }
-        window.requestAnimationFrame(draw);
+        window.requestAnimationFrame(render);
         setTimeout(move_, draw_time);
     }
     move_();
 }
 
-//reDraw();
-environment = new Environment(20, 20);
-environment.render("some_canvas");
+console.log("Path: ", path = astar.search(grid, grid[3][14], grid[27][10]));
 
+followPath(path);
 
-grid = environment.grid;
-node = grid[10][11];
-astar = new AStar(environment);
-//console.log(astar.neighbours(node, grid));
-console.log(path = astar.search(grid, grid[1][10], grid[17][17]));
-environment.render("some_canvas");
-//a_star(goal);
+// render();
+
+// environment.render("some_canvas");
